@@ -1,6 +1,9 @@
+#!/usr/bin/python
+
 import telebot
 import config
 from telebot import types
+import database
 
 bot = telebot.TeleBot(config.TOKEN)
 
@@ -93,6 +96,5 @@ def photo(message):
     msg = bot.send_message(message.chat.id, 'Балдеж', reply_markup=types.ReplyKeyboardRemove())
     bot.send_message(message.chat.id, 'Напиши категорию товара', reply_markup=types.ReplyKeyboardRemove())
     bot.register_next_step_handler(msg, add_cattegory)
-
 
 bot.polling(none_stop=True)
