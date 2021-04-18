@@ -44,6 +44,7 @@ class Product(SqlAlchemyBase):
     name = sqlalchemy.Column(sqlalchemy.String)
     description = sqlalchemy.Column(sqlalchemy.String)
     photo = sqlalchemy.Column(sqlalchemy.String)
+    stars = sqlalchemy.Column(sqlalchemy.Integer)
     
     category = orm.relation('Category', back_populates="products")
     
@@ -93,13 +94,7 @@ def add_new_product(product):
     return dbProduct.id
 
 def get_category(name):
-    print("~~")
-    for cats in session.query(Category):
-        print(cats.name)
-    print("~~")
-
     try:
-        # print(session.query(Category).filter(Category.name==name).one())
         return session.query(Category).filter(Category.name==name).one()
     except:
         return None
@@ -129,10 +124,12 @@ def update_product(id, **args):
 def get_product(id) -> Product:
     return session.query(Product).get(id)
 
-def get_product_readable(id):
-    product = get_product(id)
+def to_readable(product):
     productDict = {}
     productDict["name"] = product.name
+    productDict["stars"] = "?"
+    if product.stars:
+        productDict["stars"] = int(product.stars)
     productDict["description"] = product.description
     
     category = get_category_by_id(product.category_id)
@@ -141,7 +138,29 @@ def get_product_readable(id):
 
     productDict["photo"] = product.photo
     return productDict
+
+
+def get_product_readable(id):
+    product = get_product(id)
+    if product:
+        return to_readable(product)
+    return None
+
+def get_categories():
+    return session.query(Category)
+
+def search_by_category(category):
+    catID = get_category(category).id
+    return session.query(Product).filter(Product.category_id==catID).all()
     
-    
+def search_by_name(name):
+    try:
+        return session.query(Product).filter(Product.name==name).first()
+    except:
+        return None
+
+def search_by_review(minStars):
+    return session.query(Product).filter(Product.stars>=minStars)
+
 def get_products():
     return session.query(Product)

@@ -19,6 +19,7 @@ items.append(it4.text)
 yn_markup = markup.add(it3, it4)
 
 
+
 @bot.message_handler(commands=['start'])
 def welcome(message):
     markup = types.ReplyKeyboardMarkup(resize_keyboard=True)
@@ -39,10 +40,8 @@ def help(message):
 
 @bot.message_handler(commands=['getitem'])
 def get_item_by_id(message):
-    database.get_category("")
-    itemID = extract_arg(message.text)
-    print("Item id", itemID)
-    send_review(message, int(itemID[0]))
+    itemName = " ".join(extract_arg(message.text))
+    send_review(message, itemName)
     # bot.register_next_step_handler(msg, send_review, itemID)
 
 @bot.message_handler(content_types=['text'])
@@ -55,6 +54,7 @@ def add_items(message):
         productData = {
             "name": "",
             "description": "",
+            "stars": "",
             "category_id": "",
             "photo": ""
         }
@@ -96,19 +96,22 @@ def add_desc(message, productData):
     bot.register_next_step_handler(msg, send_review, productID)
 
 
-def send_review(message, productID):
-    msg_ok = bot.send_message(message.chat.id, 'Проверь, все ли правильно', reply_markup=types.ReplyKeyboardRemove())
+def send_review(message, productName):
+    # msg_ok = bot.send_message(message.chat.id, 'Проверь, все ли правильно', reply_markup=types.ReplyKeyboardRemove())
+    product = database.to_readable(database.search_by_name(productName))
     
-    product = database.get_product_readable(productID)
-    
-    # catt = product.category_id
-    name = product["name"]
-    desc = product["description"]
-    category = ""
-    if "category" in product:
-        category = product["category"]
-    rev = bot.send_photo(message.chat.id, open(product["photo"], 'rb'),
-                         caption=f'Название: {name}\nКатегория: {category}\nОтзыв покупателя: {desc}')
+    if product:
+        # catt = product.category_id
+        name = product["name"]
+        desc = product["description"]
+        rate = product["stars"]
+        category = ""
+        if "category" in product:
+            category = product["category"]
+            rev = bot.send_photo(message.chat.id, open(product["photo"], 'rb'),
+                                 caption=f'Название: {name}\nКатегория: {category}\nОтзыв покупателя: {desc}\nРейтинг: {rate}')
+    else:
+        bot.send_message(message.chat.id, "Not found")
 
 
 def checking_itmes(message):
@@ -146,4 +149,5 @@ def photo(message, productData):
     bot.send_message(message.chat.id, 'Напиши категорию товара', reply_markup=types.ReplyKeyboardRemove())
     bot.register_next_step_handler(msg, add_cattegory, productData)
 
+    
 bot.polling(none_stop=True)
