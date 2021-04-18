@@ -38,16 +38,26 @@ class Product(SqlAlchemyBase):
 
     id = sqlalchemy.Column(sqlalchemy.Integer,
                            primary_key=True, autoincrement=True)
+
+    
     
     name = sqlalchemy.Column(sqlalchemy.String)
     description = sqlalchemy.Column(sqlalchemy.String)
     photo = sqlalchemy.Column(sqlalchemy.String)
     
     category = orm.relation('Category', back_populates="products")
+    
     category_id = sqlalchemy.Column(sqlalchemy.Integer,
                               sqlalchemy.ForeignKey("categories.id"))
 
+    
+# class User(SqlAlchemyBase):
+#     __tablename__ = 'users'
 
+#     id = sqlalchemy.Column(sqlalchemy.Integer,
+#                            primary_key=True, autoincrement=True)
+
+#     user_id = sqlalchemy.Column(sqlalchemy.String)
 
 class Category(SqlAlchemyBase):
     __tablename__ = 'categories'
@@ -66,11 +76,47 @@ global_init(name)
 session = create_session()
 
 
-def add_new_product(product: Product) -> None:
-    session.add(product)
-    session.commit()
-    return
+def add_new_product(product):
+    #create new product from dictionary values
+    print("Category name", product["category_id"])
+    category = get_category(product["category_id"])
+    if not category:
+        category = add_category(product["category_id"])
+        print("New category", category.id, category.name)
 
+    product["category_id"] = category.id
+    print("category", category.id, category.name)
+    dbProduct = Product(**product)
+    
+    session.add(dbProduct)
+    session.commit()
+    return dbProduct.id
+
+def get_category(name):
+    print("~~")
+    for cats in session.query(Category):
+        print(cats.name)
+    print("~~")
+
+    try:
+        # print(session.query(Category).filter(Category.name==name).one())
+        return session.query(Category).filter(Category.name==name).one()
+    except:
+        return None
+    
+def get_category_by_id(id):
+    try:
+        return session.query(Category).get(id)
+    except:
+        return None
+
+
+def add_category(name):
+    newCaterogy = Category(name=name)
+    session.add(newCaterogy)
+    session.flush()
+    print("New category", newCaterogy.id, newCaterogy.name)
+    return newCaterogy
 
 def update_product(id, **args):
     product = get_product(id)
@@ -83,5 +129,19 @@ def update_product(id, **args):
 def get_product(id) -> Product:
     return session.query(Product).get(id)
 
+def get_product_readable(id):
+    product = get_product(id)
+    productDict = {}
+    productDict["name"] = product.name
+    productDict["description"] = product.description
+    
+    category = get_category_by_id(product.category_id)
+    if category:
+        productDict["category"] = category.name
+
+    productDict["photo"] = product.photo
+    return productDict
+    
+    
 def get_products():
     return session.query(Product)

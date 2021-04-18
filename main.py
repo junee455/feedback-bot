@@ -4,6 +4,8 @@ import telebot
 import config
 from telebot import types
 import database
+import datetime
+
 
 bot = telebot.TeleBot(config.TOKEN)
 
@@ -26,47 +28,87 @@ def welcome(message):
     items.append(it2.text)
 
     start_markup = markup.add(it1, it2)
-    bot.send_message(message.chat.id, 'Привет, я - Бот-отзовик. Ты можешь добавить свой отзыв на какой-либо товар или'
-                                      ' почитать отзывы других людей. Что делаем?', reply_markup=start_markup)
+    bot.send_message(message.chat.id, "start")
+    # bot.send_message(message.chat.id, 'Привет, я - Бот-отзовик. Ты можешь добавить свой отзыв на какой-либо товар или'
+                                      # ' почитать отзывы других людей. Что делаем?', reply_markup=start_markup)
 
+@bot.message_handler(commands=['help'])
+def help(message):
+    print('help')
+    bot.send_message(message.chat.id, "help help help")
+
+@bot.message_handler(commands=['getitem'])
+def get_item_by_id(message):
+    database.get_category("")
+    itemID = extract_arg(message.text)
+    print("Item id", itemID)
+    send_review(message, int(itemID[0]))
+    # bot.register_next_step_handler(msg, send_review, itemID)
 
 @bot.message_handler(content_types=['text'])
+@bot.message_handler(commands=['additem'])
 def add_items(message):
     if message.chat.type == 'private':
-        if message.text == 'Добавляем':
-            msg = bot.send_message(message.chat.id, 'Отлично, начнем с картинки, прикрепи ее:',
+        # if message.text == 'Добавляем' or :
+        msg = bot.send_message(message.chat.id, 'Отлично, начнем с картинки, прикрепи ее:',
                                    reply_markup=types.ReplyKeyboardRemove())
-            bot.register_next_step_handler(msg, photo)
+        productData = {
+            "name": "",
+            "description": "",
+            "category_id": "",
+            "photo": ""
+        }
+        bot.register_next_step_handler(msg, photo, productData)
+            
+def extract_arg(arg):
+    return arg.split()[1:]
 
+# @bot.message_handler(commands=['yourCommand'])
+# def yourCommand(message):
+    # status = extract_arg(message.text)
 
-def add_cattegory(message):
+            
+
+def add_cattegory(message, productData):
+
     handle_text(message.text, 'cattegory')
+    productData["category_id"] = message.text
     msg = bot.send_message(message.chat.id, 'Напиши название товара', reply_markup=types.ReplyKeyboardRemove())
-    bot.register_next_step_handler(msg, add_name)
+    
+    bot.register_next_step_handler(msg, add_name, productData)
 
 
-def add_name(message):
+def add_name(message, productData):
     handle_text(message.text, 'name')
+    productData["name"] = message.text
     msg = bot.send_message(message.chat.id, 'Напиши отзыв о товаре', reply_markup=types.ReplyKeyboardRemove())
-    bot.register_next_step_handler(msg, add_desc)
+    bot.register_next_step_handler(msg, add_desc, productData)
 
 
-def add_desc(message):
+def add_desc(message, productData):
     handle_text(message.text, 'description')
+    productData["description"] = message.text
     msg = bot.send_message(message.chat.id, 'Отлично. Напиши "Чек", чтобы увидеть отзыв')
-    bot.register_next_step_handler(msg, send_review)
+    print(productData)
+    
+    productID = database.add_new_product(productData)
+    
+    bot.register_next_step_handler(msg, send_review, productID)
 
 
-def send_review(message):
+def send_review(message, productID):
     msg_ok = bot.send_message(message.chat.id, 'Проверь, все ли правильно', reply_markup=types.ReplyKeyboardRemove())
-    catt_f = open('cattegory.txt', 'r')
-    catt = catt_f.read()
-    name_f = open('name.txt', 'r')
-    name = name_f.read()
-    desc_f = open('description.txt', 'r')
-    desc = desc_f.read()
-    rev = bot.send_photo(message.chat.id, open('./image.jpg', 'rb'),
-                         caption=f'Название: {name}\nКатегория: {catt}\nОтзыв покупателя: {desc}')
+    
+    product = database.get_product_readable(productID)
+    
+    # catt = product.category_id
+    name = product["name"]
+    desc = product["description"]
+    category = ""
+    if "category" in product:
+        category = product["category"]
+    rev = bot.send_photo(message.chat.id, open(product["photo"], 'rb'),
+                         caption=f'Название: {name}\nКатегория: {category}\nОтзыв покупателя: {desc}')
 
 
 def checking_itmes(message):
@@ -82,19 +124,26 @@ def handle_text(message, name):
 
 
 @bot.message_handler(content_types=['photo'])
-def photo(message):
-    print('message.photo =', message.photo)
+def photo(message, productData):
+    # print('message.photo =', message.photo)
     fileID = message.photo[-1].file_id
-    print('fileID =', fileID)
+    # print('fileID =', fileID)
     file_info = bot.get_file(fileID)
-    print('file.file_path =', file_info.file_path)
+    # print('file.file_path =', file_info.file_path)
     downloaded_file = bot.download_file(file_info.file_path)
 
-    with open("image.jpg", 'wb') as new_file:
+    
+    
+    photoFileName = str(datetime.datetime.now().timestamp())
+    
+    with open(photoFileName, 'wb') as new_file:
         new_file.write(downloaded_file)
-    bot.send_photo(message.chat.id, open('./image.jpg', 'rb'))
+    bot.send_photo(message.chat.id, open(photoFileName, 'rb'))
+    
+    productData["photo"] = photoFileName
+    
     msg = bot.send_message(message.chat.id, 'Балдеж', reply_markup=types.ReplyKeyboardRemove())
     bot.send_message(message.chat.id, 'Напиши категорию товара', reply_markup=types.ReplyKeyboardRemove())
-    bot.register_next_step_handler(msg, add_cattegory)
+    bot.register_next_step_handler(msg, add_cattegory, productData)
 
 bot.polling(none_stop=True)
